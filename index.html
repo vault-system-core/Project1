@@ -3,217 +3,289 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart QR Vault</title>
+  <title>QR Vault | Secure Edition</title>
+  <!-- Security & Scanning Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap');
+    
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --accent: #38bdf8;
-      --text: #f8fafc;
-      --text-dim: #94a3b8;
-      --danger: #ef4444;
-      --success: #22c55e;
-      --border: #334155;
+      --bg: #050505;
+      --glass: rgba(20, 20, 25, 0.6);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --neon: #00f3ff;
+      --neon-glow: 0 0 15px rgba(0, 243, 255, 0.4);
+      --danger: #ff003c;
+      --text: #ffffff;
+      --text-muted: #888;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 1.5rem 1rem; }
-    .container { max-width: 720px; margin: 0 auto; }
-    header { text-align: center; margin-bottom: 1.5rem; }
-    h1 { font-size: 1.8rem; color: var(--accent); }
-    p.subtitle { color: var(--text-dim); font-size: 0.9rem; }
-    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: var(--card-bg); padding: 0.4rem; border-radius: 10px; }
-    .tab-btn { flex: 1; padding: 0.6rem; background: transparent; border: none; color: var(--text-dim); border-radius: 8px; font-weight: 600; cursor: pointer; }
-    .tab-btn.active { background: var(--accent); color: #000; }
-    .scanner-box { background: var(--card-bg); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; border: 1px solid var(--border); }
-    #reader { width: 100%; border-radius: 8px; overflow: hidden; }
-    .scanner-actions { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
-    button.btn { background: var(--accent); color: #000; font-weight: 600; border: none; border-radius: 6px; padding: 0.6rem 1rem; cursor: pointer; width: 100%; }
-    button.btn-stop { background: var(--danger); color: #fff; }
-    .entry-modal { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.5rem; display: none; }
-    .entry-modal h3 { margin-bottom: 0.8rem; font-size: 1.1rem; }
-    label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-top: 0.6rem; }
-    input, select, textarea { width: 100%; padding: 0.6rem; margin-top: 0.2rem; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); }
-    .card-list { display: flex; flex-direction: column; gap: 1rem; }
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; position: relative; }
-    .badge { display: inline-block; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold; text-transform: uppercase; }
-    .badge-warranty { background: rgba(56, 189, 248, 0.15); color: var(--accent); }
-    .badge-medical { background: rgba(34, 197, 94, 0.15); color: var(--success); }
-    .badge-offer { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
-    .card-title { font-size: 1.1rem; margin-top: 0.4rem; }
-    .card-date { font-size: 0.85rem; color: #f59e0b; margin-top: 0.3rem; }
-    .card-body { font-size: 0.85rem; color: var(--text-dim); margin-top: 0.5rem; word-break: break-all; }
-    .card-delete { position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; }
-    .empty-state { text-align: center; color: var(--text-dim); padding: 2rem 0; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background: var(--bg); color: var(--text); overflow-x: hidden; min-height: 100vh; }
+
+    /* --- 3D Intro Sequence --- */
+    #intro-screen {
+      position: fixed; inset: 0; z-index: 999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(circle at center, #111 0%, #000 100%);
+      perspective: 1000px;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    .vault-door {
+      width: 300px; height: 300px;
+      border: 2px solid var(--glass-border);
+      border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: var(--glass);
+      backdrop-filter: blur(10px);
+      transform-style: preserve-3d;
+      transition: transform 1.5s cubic-bezier(0.25, 1, 0.5, 1);
+      box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
+    }
+    .vault-door.open { transform: rotateY(105deg) translateZ(100px); opacity: 0; }
+    .vault-door h1 { font-size: 1.5rem; letter-spacing: 3px; color: var(--neon); text-shadow: var(--neon-glow); margin-bottom: 20px; }
+    
+    .pin-input {
+      background: transparent; border: none; border-bottom: 2px solid var(--neon);
+      color: var(--text); font-size: 1.5rem; text-align: center; width: 120px;
+      outline: none; letter-spacing: 5px; margin-bottom: 20px; transition: border-color 0.3s;
+    }
+    .pin-input.error { border-bottom-color: var(--danger); }
+    .btn {
+      background: transparent; border: 1px solid var(--neon); color: var(--neon);
+      padding: 10px 25px; border-radius: 4px; cursor: pointer; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; transition: all 0.3s ease;
+    }
+    .btn:hover { background: var(--neon); color: #000; box-shadow: var(--neon-glow); }
+
+    /* --- Main Dashboard (Glassmorphism) --- */
+    #dashboard { display: none; max-width: 800px; margin: 0 auto; padding: 2rem 1rem; opacity: 0; transition: opacity 1s ease; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem; }
+    header h2 { color: var(--neon); text-shadow: var(--neon-glow); font-weight: 300; }
+    
+    .glass-panel {
+      background: var(--glass); border: 1px solid var(--glass-border);
+      backdrop-filter: blur(15px); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+
+    /* Scanner HUD */
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--neon); }
+    .hud-overlay { position: relative; }
+    .hud-overlay::before, .hud-overlay::after {
+      content: ''; position: absolute; width: 20px; height: 20px; border: 2px solid var(--neon); z-index: 10;
+    }
+    .hud-overlay::before { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+    .hud-overlay::after { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+
+    /* Form & Controls */
+    input, select, textarea {
+      width: 100%; padding: 10px; margin-top: 8px; margin-bottom: 15px;
+      background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border);
+      color: var(--text); border-radius: 6px; outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--neon); }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+    .data-card {
+      background: rgba(20, 20, 25, 0.8); border: 1px solid var(--glass-border);
+      border-radius: 10px; padding: 1.2rem; transition: transform 0.2s; position: relative;
+    }
+    .data-card:hover { transform: translateY(-3px); border-color: rgba(0, 243, 255, 0.3); }
+    .badge { position: absolute; top: 1rem; right: 1rem; font-size: 0.7rem; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 1px; }
+    .cat-medical { background: rgba(0, 255, 128, 0.1); color: #00ff80; border: 1px solid #00ff80; }
+    .cat-warranty { background: rgba(0, 243, 255, 0.1); color: var(--neon); border: 1px solid var(--neon); }
+    .card-title { font-size: 1.1rem; font-weight: 500; margin-bottom: 5px; width: 80%; }
+    .card-date { font-size: 0.8rem; color: #ffae00; margin-bottom: 10px; }
+    .card-data { font-size: 0.85rem; color: var(--text-muted); background: #000; padding: 8px; border-radius: 4px; word-break: break-all; }
+    .delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; margin-top: 10px; font-size: 0.8rem; }
   </style>
 </head>
 <body>
-  <div class="container">
+
+  <!-- 3D Entry Sequence -->
+  <div id="intro-screen">
+    <div class="vault-door" id="vaultDoor">
+      <h1>SECURE VAULT</h1>
+      <p style="font-size: 0.7rem; color: #888; margin-bottom: 10px;" id="pinStatus">ENTER MASTER PIN</p>
+      <input type="password" id="masterPin" class="pin-input" maxlength="6" placeholder="•••" onkeypress="if(event.key === 'Enter') unlockVault()">
+      <button class="btn" onclick="unlockVault()">DECRYPT</button>
+    </div>
+  </div>
+
+  <!-- Main Dashboard -->
+  <div id="dashboard">
     <header>
-      <h1>QR Vault</h1>
-      <p class="subtitle">Secure offline vault for warranties, medical records & offers</p>
+      <h2>SYSTEM.CORE</h2>
+      <button class="btn" style="padding: 5px 15px; font-size: 0.8rem; border-color: var(--danger); color: var(--danger);" onclick="location.reload()">LOCK</button>
     </header>
 
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('all')">All Items</button>
-      <button class="tab-btn" onclick="switchTab('warranty')">Warranties</button>
-      <button class="tab-btn" onclick="switchTab('medical')">Medical</button>
-      <button class="tab-btn" onclick="switchTab('offer')">Offers</button>
-    </div>
-
-    <div class="scanner-box">
-      <div id="reader"></div>
-      <div class="scanner-actions">
-        <button id="scanBtn" class="btn" onclick="startScanner()">Open Scanner</button>
-        <button id="stopBtn" class="btn btn-stop" style="display:none;" onclick="stopScanner()">Stop</button>
+    <div class="glass-panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3>Scanner HUD</h3>
+        <button id="scanBtn" class="btn" onclick="initScanner()">INITIALIZE CAMERA</button>
+        <button id="stopBtn" class="btn" style="display:none; border-color: var(--danger); color: var(--danger);" onclick="stopScanner()">TERMINATE</button>
+      </div>
+      <div class="hud-overlay">
+        <div id="reader"></div>
       </div>
     </div>
 
-    <div id="entryModal" class="entry-modal">
-      <h3>Store Scanned Entry</h3>
-      <label>Category</label>
+    <div id="entryForm" class="glass-panel" style="display: none; border-color: var(--neon);">
+      <h3 style="color: var(--neon); margin-bottom: 10px;">ENCRYPT NEW RECORD</h3>
       <select id="entryCategory">
-        <option value="warranty">Warranty / Guarantee (e.g., Lenskart, Electronics)</option>
-        <option value="medical">Medical / Prescription (e.g., Medicine, Lab Test)</option>
-        <option value="offer">Voucher / Expiring Offer</option>
+        <option value="warranty">Warranty / Guarantee</option>
+        <option value="medical">Medical / Prescription</option>
       </select>
-
-      <label>Title / Identifier</label>
-      <input type="text" id="entryTitle" placeholder="e.g., Lenskart Eyewear, Medicine Prescriptions">
-
-      <label>Expiry / Last Date</label>
+      <input type="text" id="entryTitle" placeholder="Identifier (e.g., Lenskart Rx)">
       <input type="date" id="entryDate">
-
-      <label>Extracted Details / Raw Payload</label>
-      <textarea id="entryData" rows="3"></textarea>
-
-      <button class="btn" style="margin-top:1rem;" onclick="saveEntry()">Save to Vault</button>
+      <textarea id="entryData" rows="3" placeholder="Extracted Payload..."></textarea>
+      <button class="btn" style="width: 100%; background: var(--neon); color: #000;" onclick="saveEncryptedRecord()">ENCRYPT & STORE</button>
     </div>
 
-    <div id="cardContainer" class="card-list"></div>
+    <div class="grid" id="vaultGrid"></div>
   </div>
 
   <script>
+    let vaultPin = '';
     let html5QrCode = null;
-    let currentFilter = 'all';
+    const STORAGE_KEY = 'vault_core_encrypted_v1';
 
-    function getItems() {
-      return JSON.parse(localStorage.getItem('qr_vault_records') || '[]');
-    }
+    // --- Core Security Engine (AES-256) ---
+    function unlockVault() {
+      const input = document.getElementById('masterPin');
+      const pin = input.value.trim();
+      if(pin.length < 3) return triggerError(input);
 
-    function saveItems(items) {
-      localStorage.setItem('qr_vault_records', JSON.stringify(items));
-    }
-
-    function renderCards() {
-      const container = document.getElementById('cardContainer');
-      const items = getItems();
-      const filtered = currentFilter === 'all' ? items : items.filter(i => i.category === currentFilter);
-
-      if (!filtered.length) {
-        container.innerHTML = `<div class="empty-state">No entries logged in this category.</div>`;
-        return;
+      const rawData = localStorage.getItem(STORAGE_KEY);
+      
+      if (!rawData) {
+        // First time setup
+        vaultPin = pin;
+        document.getElementById('pinStatus').innerText = "NEW VAULT CREATED";
+        executeEntrySequence();
+      } else {
+        // Decrypt attempt
+        try {
+          const bytes = CryptoJS.AES.decrypt(rawData, pin);
+          const decrypted = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+          if(Array.isArray(decrypted)) {
+            vaultPin = pin;
+            executeEntrySequence();
+            renderGrid(decrypted);
+          } else { throw new Error('Bad Payload'); }
+        } catch (e) {
+          triggerError(input);
+          document.getElementById('pinStatus').innerText = "DECRYPTION FAILED";
+          document.getElementById('pinStatus').style.color = "var(--danger)";
+        }
       }
+    }
 
-      container.innerHTML = filtered.map((item) => `
-        <div class="card">
-          <span class="badge badge-${item.category}">${item.category}</span>
-          <button class="card-delete" onclick="deleteEntry(${item.id})">&times;</button>
-          <div class="card-title">${escapeHtml(item.title)}</div>
-          <div class="card-date">Valid / Expiry: <strong>${item.date || 'Indefinite'}</strong></div>
-          <div class="card-body">${escapeHtml(item.data)}</div>
+    function triggerError(el) {
+      el.classList.add('error');
+      setTimeout(() => el.classList.remove('error'), 1000);
+      el.value = '';
+    }
+
+    function executeEntrySequence() {
+      const door = document.getElementById('vaultDoor');
+      const intro = document.getElementById('intro-screen');
+      const dash = document.getElementById('dashboard');
+      
+      door.classList.add('open');
+      setTimeout(() => {
+        intro.style.opacity = '0';
+        intro.style.visibility = 'hidden';
+        dash.style.display = 'block';
+        setTimeout(() => dash.style.opacity = '1', 50);
+      }, 800);
+    }
+
+    function getDecryptedRecords() {
+      const rawData = localStorage.getItem(STORAGE_KEY);
+      if(!rawData) return [];
+      const bytes = CryptoJS.AES.decrypt(rawData, vaultPin);
+      return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+    }
+
+    function saveSecurely(records) {
+      const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(records), vaultPin).toString();
+      localStorage.setItem(STORAGE_KEY, ciphertext);
+    }
+
+    // --- UI & Logic ---
+    function renderGrid(records) {
+      const grid = document.getElementById('vaultGrid');
+      grid.innerHTML = records.map(r => `
+        <div class="data-card">
+          <span class="badge cat-${r.category}">${r.category}</span>
+          <div class="card-title">${escapeHtml(r.title)}</div>
+          <div class="card-date">EXP: ${r.date || 'UNLIMITED'}</div>
+          <div class="card-data">${escapeHtml(r.data)}</div>
+          <button class="delete-btn" onclick="deleteRecord(${r.id})">PURGE RECORD</button>
         </div>
       `).join('');
     }
 
-    function switchTab(tab) {
-      currentFilter = tab;
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
-      renderCards();
-    }
-
-    function startScanner() {
+    function initScanner() {
       html5QrCode = new Html5Qrcode("reader");
       document.getElementById('scanBtn').style.display = 'none';
       document.getElementById('stopBtn').style.display = 'block';
-
+      
       html5QrCode.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
           stopScanner();
-          handleScannedData(decodedText);
+          document.getElementById('entryForm').style.display = 'block';
+          document.getElementById('entryData').value = decodedText;
+          autoParse(decodedText);
         },
-        (errorMessage) => {}
-      ).catch(err => {
-        alert("Camera error: " + err);
-        stopScanner();
-      });
+        () => {} // Ignore frame errors
+      );
     }
 
     function stopScanner() {
-      if (html5QrCode) {
+      if(html5QrCode) {
         html5QrCode.stop().then(() => {
           html5QrCode.clear();
           document.getElementById('scanBtn').style.display = 'block';
           document.getElementById('stopBtn').style.display = 'none';
-        }).catch(() => {});
+        }).catch(()=>{});
       }
     }
 
-    function handleScannedData(text) {
-      const modal = document.getElementById('entryModal');
-      const dataField = document.getElementById('entryData');
-      const titleField = document.getElementById('entryTitle');
-      const dateField = document.getElementById('entryDate');
-
-      modal.style.display = 'block';
-      dataField.value = text;
-
-      if (text.toLowerCase().includes('lenskart')) {
-        titleField.value = "Lenskart Order / Warranty";
-        document.getElementById('entryCategory').value = "warranty";
-      } else if (text.toLowerCase().includes('rx') || text.toLowerCase().includes('med')) {
-        titleField.value = "Prescription / Medicine";
-        document.getElementById('entryCategory').value = "medical";
-      } else {
-        titleField.value = "Scan #" + Math.floor(Math.random() * 1000);
-      }
-
+    function autoParse(text) {
+      const t = text.toLowerCase();
+      document.getElementById('entryCategory').value = (t.includes('rx') || t.includes('med')) ? 'medical' : 'warranty';
+      document.getElementById('entryTitle').value = t.includes('lenskart') ? "Lenskart Authenticity" : "Scanned Payload";
       const dateMatch = text.match(/(\d{4}[-/]\d{2}[-/]\d{2})/);
-      if (dateMatch) {
-        dateField.value = dateMatch[0].replace(/\//g, '-');
-      }
+      if(dateMatch) document.getElementById('entryDate').value = dateMatch[0].replace(/\//g, '-');
     }
 
-    function saveEntry() {
-      const items = getItems();
-      const newEntry = {
+    function saveEncryptedRecord() {
+      const records = getDecryptedRecords();
+      records.unshift({
         id: Date.now(),
         category: document.getElementById('entryCategory').value,
         title: document.getElementById('entryTitle').value || 'Untitled',
         date: document.getElementById('entryDate').value,
         data: document.getElementById('entryData').value
-      };
-
-      items.unshift(newEntry);
-      saveItems(items);
-      document.getElementById('entryModal').style.display = 'none';
-      renderCards();
+      });
+      saveSecurely(records);
+      document.getElementById('entryForm').style.display = 'none';
+      renderGrid(records);
     }
 
-    function deleteEntry(id) {
-      const items = getItems().filter(item => item.id !== id);
-      saveItems(items);
-      renderCards();
+    function deleteRecord(id) {
+      saveSecurely(getDecryptedRecords().filter(r => r.id !== id));
+      renderGrid(getDecryptedRecords());
     }
 
     function escapeHtml(str) {
       return (str || '').replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[m]);
     }
-
-    renderCards();
   </script>
 </body>
 </html>
